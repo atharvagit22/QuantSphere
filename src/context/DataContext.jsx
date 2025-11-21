@@ -15,12 +15,7 @@ import { computeRSI, computeMACD } from "../utils/indicators.js";
 
 import WebSocketManager from "./WebSocketManager.js";
 import createPortfolioEngine from "./PortfolioEngine.js";
-
-// ✅ FIXED: correct filename / case-sensitive import
-// FIXED: correct filename / case-sensitive import
-import AlertsEngine from "./AlertsEngine.js";
-
-
+import createAlertsEngine from "./AlertsEngine.js";   // ✅ Correct
 
 import { ema as _ema } from "../utils/analyticsHelpers.js";
 
@@ -53,9 +48,7 @@ export function DataProvider({ children }) {
 
   if (!wsManagerRef.current) wsManagerRef.current = WebSocketManager();
   if (!portfolioRef.current) portfolioRef.current = createPortfolioEngine();
-
-  // ✅ FIXED: AlertsEngine is a CLASS → must call new AlertsEngine()
-  if (!alertsRef.current) alertsRef.current = new AlertsEngine();
+  if (!alertsRef.current) alertsRef.current = createAlertsEngine(); // ✅ FIXED
 
   const wsManager = wsManagerRef.current;
   const portfolio = portfolioRef.current;
@@ -69,17 +62,25 @@ export function DataProvider({ children }) {
 
   function enrichData(parsed) {
     const out = { ...parsed };
-    const priceSeries = (out.equityData || []).map((p) => Number(p.equity || 0));
+
+    const priceSeries = (out.equityData || []).map((p) =>
+      Number(p.equity || 0)
+    );
 
     try {
       out.indicators = {
-        rsi: computeRSI ? computeRSI(priceSeries, 14) : [],
-        macd: computeMACD
-          ? computeMACD(priceSeries, { fast: 12, slow: 26, signal: 9 })
-          : { macd: [], signal: [], hist: [] },
+        rsi: computeRSI(priceSeries, 14),
+        macd: computeMACD(priceSeries, {
+          fast: 12,
+          slow: 26,
+          signal: 9,
+        }),
       };
     } catch {
-      out.indicators = { rsi: [], macd: { macd: [], signal: [], hist: [] } };
+      out.indicators = {
+        rsi: [],
+        macd: { macd: [], signal: [], hist: [] },
+      };
     }
 
     out.markers = (out.orders || []).map((o) => ({
@@ -139,9 +140,7 @@ export function DataProvider({ children }) {
             volume: Number(c[5]),
           }));
           return { source: "binance", symbol, interval, candles };
-        } catch (err) {
-          console.warn("Binance OHLC error", err);
-        }
+        } catch {}
       }
 
       if (!ALPHA_KEY) throw new Error("Missing VITE_ALPHA_KEY.");
@@ -150,8 +149,10 @@ export function DataProvider({ children }) {
         if (interval === "daily") {
           const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${symbol}&outputsize=compact&apikey=${ALPHA_KEY}`;
           const res = await axios.get(url);
+
           const raw = res.data["Time Series (Daily)"] || {};
           const times = Object.keys(raw).slice(0, 500).reverse();
+
           const candles = times.map((t) => ({
             time: t,
             open: Number(raw[t]["1. open"]),
@@ -171,11 +172,11 @@ export function DataProvider({ children }) {
 
           const candles = times.map((t) => ({
             time: t,
-            open: Number(raw[t]["1. open"] ?? raw[t].open ?? 0),
-            high: Number(raw[t]["2. high"] ?? raw[t].high ?? 0),
-            low: Number(raw[t]["3. low"] ?? raw[t].low ?? 0),
-            close: Number(raw[t]["4. close"] ?? raw[t].close ?? 0),
-            volume: Number(raw[t]["5. volume"] ?? raw[t].volume ?? 0),
+            open: Number(raw[t]["1. open"]),
+            high: Number(raw[t]["2. high"]),
+            low: Number(raw[t]["3. low"]),
+            close: Number(raw[t]["4. close"]),
+            volume: Number(raw[t]["5. volume"]),
           }));
 
           return { source: "alphavantage", symbol, interval, candles };
@@ -215,6 +216,7 @@ export function DataProvider({ children }) {
             const last = res.data[res.data.length - 1];
             const prev = res.data[res.data.length - 2];
             const pct = prev ? (last[4] - prev[4]) / prev[4] : 0;
+
             results.push({
               symbol: s,
               pct,
@@ -226,30 +228,30 @@ export function DataProvider({ children }) {
               results.push({ symbol: s, pct: 0, source: "none" });
               continue;
             }
+
             const res = await axios.get(
               `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${s}&outputsize=compact&apikey=${ALPHA_KEY}`
             );
             const raw = res.data["Time Series (Daily)"] || {};
             const keys = Object.keys(raw).slice(0, 2);
+
             if (keys.length >= 2) {
               const last = Number(raw[keys[0]]["4. close"]);
               const prev = Number(raw[keys[1]]["4. close"]);
               const pct = prev ? (last - prev) / prev : 0;
+
               results.push({ symbol: s, pct, source: "alphavantage", last });
             } else {
-              results.push({
-                symbol: s,
-                pct: 0,
-                source: "alphavantage",
-                last: 0,
-              });
+              results.push({ symbol: s, pct: 0, source: "alphavantage", last: 0 });
             }
           }
+
           await new Promise((r) => setTimeout(r, 200));
-        } catch (err) {
+        } catch {
           results.push({ symbol: s, pct: 0, source: "error" });
         }
       }
+
       return results.sort((a, b) => b.pct - a.pct);
     },
     [ALPHA_KEY]
@@ -257,8 +259,9 @@ export function DataProvider({ children }) {
 
   function syncLiveToDashboard(livePayload) {
     if (!livePayload) return;
+
     const candles = livePayload.candles || [];
-    if (!Array.isArray(candles) || candles.length === 0) return;
+    if (!candles.length) return;
 
     setLiveData((prev) => ({ ...(prev || {}), ...livePayload, candles }));
 
@@ -276,12 +279,10 @@ export function DataProvider({ children }) {
       };
     });
 
-    const returns = [];
-    for (let i = 1; i < equityData.length; i++) {
-      const a = equityData[i - 1].equity;
-      const b = equityData[i].equity;
-      returns.push(a ? (b - a) / a : 0);
-    }
+    const returns = equityData.slice(1).map((p, i) => {
+      const prev = equityData[i].equity;
+      return prev ? (p.equity - prev) / prev : 0;
+    });
 
     const newData = {
       equityData,
@@ -293,12 +294,8 @@ export function DataProvider({ children }) {
           ? equityData[equityData.length - 1].equity -
             equityData[0].equity
           : 0,
-        win_rate: returns.length
-          ? returns.filter((r) => r > 0).length / returns.length
-          : 0,
-        max_drawdown: drawdownData.length
-          ? Math.min(...drawdownData.map((d) => d.value))
-          : 0,
+        win_rate: returns.filter((r) => r > 0).length / returns.length || 0,
+        max_drawdown: Math.min(...drawdownData.map((d) => d.value)),
         total_trades: (livePayload.orders || []).length,
       },
     };
@@ -322,38 +319,6 @@ export function DataProvider({ children }) {
     localStorage.removeItem("qd_data_v1");
   }
 
-  const positions = portfolio.getPositions();
-  const simOrders = portfolio.getOrders();
-
-  const openPosition = portfolio.openPosition;
-  const closePosition = portfolio.closePosition;
-  const updateUnrealizedPrices = portfolio.updateUnrealizedPrices;
-  const computeSimulatorKPIs = portfolio.computeSimulatorKPIs;
-
-  const alerts = alertsEngine.getAlerts();
-  const addAlert = alertsEngine.addAlert;
-  const removeAlert = alertsEngine.removeAlert;
-  const toggleAlert = alertsEngine.toggleAlert;
-  const alertsLog = alertsEngine.getLog;
-  const pushAlertEvent = alertsEngine.pushEvent;
-
-  function connectWS(symbol, opts = { type: "trade" }, onMessage) {
-    if (typeof onMessage === "function") wsManager.subscribe(onMessage);
-    return wsManager.connect(symbol, opts);
-  }
-
-  function disconnectWS() {
-    return wsManager.disconnect();
-  }
-
-  function subscribeTrades(handler) {
-    wsManager.subscribe(handler);
-  }
-
-  function unsubscribeTrades(handler) {
-    wsManager.unsubscribe(handler);
-  }
-
   const api = {
     data,
     setData,
@@ -361,44 +326,58 @@ export function DataProvider({ children }) {
     setCsvData,
     liveData,
     setLiveData,
+
     mode,
     setMode,
+
     get current() {
       return mode === "live" && liveData
         ? { ...(liveData || {}), source: "live" }
         : data || csvData || {};
     },
+
     loadCSVFile,
     loadMultipleCSVFiles,
     loadDemo,
     resetData,
+
     fetchOHLC,
     fetchOrderbook,
-    connectWS,
-    disconnectWS,
-    subscribeTrades,
-    unsubscribeTrades,
     fetchTrending,
     syncLiveToDashboard,
-    positions,
-    orders: simOrders,
-    openPosition,
-    closePosition,
-    getPositions: portfolio.getPositions,
-    getOrders: portfolio.getOrders,
-    updateUnrealizedPrices,
-    computeSimulatorKPIs,
-    alerts,
-    addAlert,
-    removeAlert,
-    toggleAlert,
+
+    // Portfolio
+    positions: portfolio.getPositions(),
+    orders: portfolio.getOrders(),
+    openPosition: portfolio.openPosition,
+    closePosition: portfolio.closePosition,
+    updateUnrealizedPrices: portfolio.updateUnrealizedPrices,
+    computeSimulatorKPIs: portfolio.computeSimulatorKPIs,
+
+    // Alerts
+    alerts: alertsEngine.getAlerts(),
+    addAlert: alertsEngine.addAlert,
+    removeAlert: alertsEngine.removeAlert,
+    toggleAlert: alertsEngine.toggleAlert,
     alertsLog: alertsEngine.getLog(),
-    pushAlertEvent,
+    pushAlertEvent: alertsEngine.pushEvent,
+
+    // WebSocket
+    connectWS: (sym, opts, cb) => {
+      if (typeof cb === "function") wsManager.subscribe(cb);
+      return wsManager.connect(sym, opts);
+    },
+    disconnectWS: wsManager.disconnect,
+    subscribeTrades: wsManager.subscribe,
+    unsubscribeTrades: wsManager.unsubscribe,
+
     isLiveSynced,
     setIsLiveSynced,
   };
 
-  return <DataContext.Provider value={api}>{children}</DataContext.Provider>;
+  return (
+    <DataContext.Provider value={api}>{children}</DataContext.Provider>
+  );
 }
 
 export function useData() {
