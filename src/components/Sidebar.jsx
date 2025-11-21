@@ -5,6 +5,7 @@ import { LayoutDashboard, BarChart2, PieChart, Shield, Activity, GitCompare, Zap
 
 const tabs = [
  
+
  { name: "Dashboard", id: "dashboard", icon: <LayoutDashboard size={18} /> },
  { name: "Live", id: "live", icon: <Zap size={18} /> },
   { name: "Analytics", id: "analytics", icon: <BarChart2 size={18} /> },
