@@ -1,34 +1,24 @@
 // src/context/AlertsEngine.js
-//
-// Simple alerts registry + history used by DataContext.
-// Factory function — NOT a class.
+// Factory function, not a class.
 
 export default function createAlertsEngine() {
-  const KEY_ALERTS = "qd_alerts_v1";
-  const KEY_LOG = "qd_alerts_log_v1";
+  const KEY_A = "qd_alerts_v1";
+  const KEY_L = "qd_alerts_log_v1";
 
   let alerts = [];
   let log = [];
 
-  // Load existing alerts
   try {
-    const raw = localStorage.getItem(KEY_ALERTS);
-    if (raw) alerts = JSON.parse(raw) || [];
+    alerts = JSON.parse(localStorage.getItem(KEY_A)) || [];
   } catch {}
 
-  // Load existing log
   try {
-    const raw = localStorage.getItem(KEY_LOG);
-    if (raw) log = JSON.parse(raw) || [];
+    log = JSON.parse(localStorage.getItem(KEY_L)) || [];
   } catch {}
 
   function persist() {
-    try {
-      localStorage.setItem(KEY_ALERTS, JSON.stringify(alerts));
-    } catch {}
-    try {
-      localStorage.setItem(KEY_LOG, JSON.stringify(log));
-    } catch {}
+    try { localStorage.setItem(KEY_A, JSON.stringify(alerts)); } catch {}
+    try { localStorage.setItem(KEY_L, JSON.stringify(log)); } catch {}
   }
 
   function getAlerts() {
@@ -45,13 +35,17 @@ export default function createAlertsEngine() {
       ts: new Date().toISOString(),
       ...event,
     };
-    log = [e, ...log].slice(0, 300);
+    log = [e, ...log].slice(0, 500);
     persist();
     return e;
   }
 
   function addAlert(payload) {
-    const a = { id: `alert-${Date.now()}`, enabled: true, ...payload };
+    const a = {
+      id: `alert-${Date.now()}`,
+      enabled: true,
+      ...payload,
+    };
     alerts = [a, ...alerts];
     persist();
     return a;
