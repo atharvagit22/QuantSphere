@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  scroll-behavior: smooth;
+}
+
+.dark {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+button {
+  transition: all 0.2s ease-in-out;
+}

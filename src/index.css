@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* -----------------------------------------------------------
+   GLOBAL THEME + VARIABLES
+----------------------------------------------------------- */
+:root {
+  --glass-bg: rgba(255,255,255,0.03);
+  --glass-border: rgba(255,255,255,0.06);
+  --accent-1:  #7c3aed; /* purple */
+  --accent-2:  #06b6d4; /* teal */
+  --accent-3:  #60a5fa; /* blue */
+  --accent-red: #ef4444;
+  --accent-green: #10b981;
+  --accent-yellow: #f59e0b;
+}
+
+/* -----------------------------------------------------------
+   GLOBAL BODY + TYPOGRAPHY
+----------------------------------------------------------- */
+body {
+  @apply bg-[#06060a] text-gray-200 antialiased;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial;
+}
+
+/* Headings */
+h1, h2, h3, h4 { @apply tracking-tight; }
+h1 { @apply text-2xl font-bold; }
+h2 { @apply text-xl font-semibold; }
+h3 { @apply text-lg font-semibold; }
+
+/* -----------------------------------------------------------
+   GLASS CARD — PRO VERSION
+----------------------------------------------------------- */
+.glass-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 1rem;
+  transition: all 0.25s ease;
+}
+.glass-card:hover {
+  border-color: rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.025));
+}
+
+/* Mini top gradient bar */
+.card-header {
+  height: 5px;
+  width: 64px;
+  background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+  opacity: 0.3;
+  border-radius: 100px;
+}
+
+/* -----------------------------------------------------------
+   BUTTON STYLES — Unified System
+----------------------------------------------------------- */
+.btn {
+  @apply px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 cursor-pointer;
+}
+.btn:hover {
+  @apply opacity-80;
+}
+.btn-primary {
+  background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+  color: white;
+}
+.btn-outline {
+  @apply border border-gray-700 text-gray-300;
+}
+.btn-danger {
+  background: var(--accent-red);
+  color: white;
+}
+.btn-success {
+  background: var(--accent-green);
+  color: #06281b;
+}
+
+/* -----------------------------------------------------------
+   SCROLLBAR — Modern Thin
+----------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* -----------------------------------------------------------
+   ANIMATIONS
+----------------------------------------------------------- */
+.fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
+.slide-up {
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* -----------------------------------------------------------
+   CHART HELPERS
+----------------------------------------------------------- */
+.chart-axis-text {
+  color: rgba(255,255,255,0.6);
+  font-size: 12px;
+}
+
+.kpi-sparkline { height: 36px; }
+
+/* -----------------------------------------------------------
+   THEMES (Optional)
+----------------------------------------------------------- */
+.theme-glass { background: #06060a; }
+.theme-cyber { background: linear-gradient(180deg,#020216,#0b0218); }
+.theme-white { background: #f8fafc; color: #0b1220; }
+.theme-bloomberg { background: #071018; }
