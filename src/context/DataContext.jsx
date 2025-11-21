@@ -15,7 +15,13 @@ import { computeRSI, computeMACD } from "../utils/indicators.js";
 
 import WebSocketManager from "./WebSocketManager.js";
 import createPortfolioEngine from "./PortfolioEngine.js";
-import createAlertsEngine from "./AlertsEngine.js";
+
+// ✅ FIXED: correct filename / case-sensitive import
+// FIXED: correct filename / case-sensitive import
+import AlertsEngine from "./AlertsEngine.js";
+
+
+
 import { ema as _ema } from "../utils/analyticsHelpers.js";
 
 const DataContext = createContext(null);
@@ -29,8 +35,10 @@ export function DataProvider({ children }) {
       return {};
     }
   });
+
   const [csvData, setCsvData] = useState(() => data || {});
   const [liveData, setLiveData] = useState(null);
+
   const [mode, setMode] = useState("csv");
   const [isLiveSynced, setIsLiveSynced] = useState(false);
 
@@ -45,7 +53,9 @@ export function DataProvider({ children }) {
 
   if (!wsManagerRef.current) wsManagerRef.current = WebSocketManager();
   if (!portfolioRef.current) portfolioRef.current = createPortfolioEngine();
-  if (!alertsRef.current) alertsRef.current = createAlertsEngine();
+
+  // ✅ FIXED: AlertsEngine is a CLASS → must call new AlertsEngine()
+  if (!alertsRef.current) alertsRef.current = new AlertsEngine();
 
   const wsManager = wsManagerRef.current;
   const portfolio = portfolioRef.current;
@@ -59,9 +69,7 @@ export function DataProvider({ children }) {
 
   function enrichData(parsed) {
     const out = { ...parsed };
-    const priceSeries = (out.equityData || []).map((p) =>
-      Number(p.equity || 0)
-    );
+    const priceSeries = (out.equityData || []).map((p) => Number(p.equity || 0));
 
     try {
       out.indicators = {
@@ -112,6 +120,7 @@ export function DataProvider({ children }) {
         /USDT$|BTC$|ETH$|USD$/i.test(symbol) ||
         symbol.toLowerCase().includes("btc") ||
         symbol.toLowerCase().includes("usdt");
+
       const useBinance = source === "binance" || (source === "auto" && isCrypto);
 
       if (useBinance) {
@@ -158,7 +167,7 @@ export function DataProvider({ children }) {
           const res = await axios.get(url);
 
           const raw = res.data[`Time Series (${interval})`] || {};
-          const times = Object.keys(raw || {}).slice(0, 500).reverse();
+          const times = Object.keys(raw).slice(0, 500).reverse();
 
           const candles = times.map((t) => ({
             time: t,
@@ -182,7 +191,10 @@ export function DataProvider({ children }) {
   const fetchOrderbook = useCallback(async (symbol, limit = 50) => {
     try {
       const sym = symbol.toUpperCase();
-      const url = `https://api.binance.com/api/v3/depth?symbol=${sym}&limit=${Math.min(1000, limit)}`;
+      const url = `https://api.binance.com/api/v3/depth?symbol=${sym}&limit=${Math.min(
+        1000,
+        limit
+      )}`;
       const res = await axios.get(url);
       return res.data;
     } catch (err) {
@@ -191,55 +203,77 @@ export function DataProvider({ children }) {
     }
   }, []);
 
-  const fetchTrending = useCallback(async (symbols = ["AAPL", "TSLA", "MSFT", "NVDA", "BTCUSDT"]) => {
-    const results = [];
-    for (const s of symbols) {
-      try {
-        if (/USDT$|BTC$|ETH$/i.test(s)) {
-          const res = await axios.get(`https://api.binance.com/api/v3/klines?symbol=${s.toUpperCase()}&interval=1d&limit=2`);
-          const last = res.data[res.data.length - 1];
-          const prev = res.data[res.data.length - 2];
-          const pct = prev ? (last[4] - prev[4]) / prev[4] : 0;
-          results.push({ symbol: s, pct, source: "binance", last: Number(last[4]) });
-        } else {
-          if (!ALPHA_KEY) {
-            results.push({ symbol: s, pct: 0, source: "none" });
-            continue;
-          }
-          const res = await axios.get(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${s}&outputsize=compact&apikey=${ALPHA_KEY}`);
-          const raw = res.data["Time Series (Daily)"] || {};
-          const keys = Object.keys(raw).slice(0, 2);
-          if (keys.length >= 2) {
-            const last = Number(raw[keys[0]]["4. close"]);
-            const prev = Number(raw[keys[1]]["4. close"]);
-            const pct = prev ? (last - prev) / prev : 0;
-            results.push({ symbol: s, pct, source: "alphavantage", last });
+  const fetchTrending = useCallback(
+    async (symbols = ["AAPL", "TSLA", "MSFT", "NVDA", "BTCUSDT"]) => {
+      const results = [];
+      for (const s of symbols) {
+        try {
+          if (/USDT$|BTC$|ETH$/i.test(s)) {
+            const res = await axios.get(
+              `https://api.binance.com/api/v3/klines?symbol=${s.toUpperCase()}&interval=1d&limit=2`
+            );
+            const last = res.data[res.data.length - 1];
+            const prev = res.data[res.data.length - 2];
+            const pct = prev ? (last[4] - prev[4]) / prev[4] : 0;
+            results.push({
+              symbol: s,
+              pct,
+              source: "binance",
+              last: Number(last[4]),
+            });
           } else {
-            results.push({ symbol: s, pct: 0, source: "alphavantage", last: 0 });
+            if (!ALPHA_KEY) {
+              results.push({ symbol: s, pct: 0, source: "none" });
+              continue;
+            }
+            const res = await axios.get(
+              `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${s}&outputsize=compact&apikey=${ALPHA_KEY}`
+            );
+            const raw = res.data["Time Series (Daily)"] || {};
+            const keys = Object.keys(raw).slice(0, 2);
+            if (keys.length >= 2) {
+              const last = Number(raw[keys[0]]["4. close"]);
+              const prev = Number(raw[keys[1]]["4. close"]);
+              const pct = prev ? (last - prev) / prev : 0;
+              results.push({ symbol: s, pct, source: "alphavantage", last });
+            } else {
+              results.push({
+                symbol: s,
+                pct: 0,
+                source: "alphavantage",
+                last: 0,
+              });
+            }
           }
+          await new Promise((r) => setTimeout(r, 200));
+        } catch (err) {
+          results.push({ symbol: s, pct: 0, source: "error" });
         }
-        await new Promise((r) => setTimeout(r, 200));
-      } catch (err) {
-        results.push({ symbol: s, pct: 0, source: "error" });
       }
-    }
-    return results.sort((a, b) => b.pct - a.pct);
-  }, [ALPHA_KEY]);
+      return results.sort((a, b) => b.pct - a.pct);
+    },
+    [ALPHA_KEY]
+  );
 
-  // Sync live -> dashboard; note: setIsLiveSynced is toggled by caller
   function syncLiveToDashboard(livePayload) {
     if (!livePayload) return;
     const candles = livePayload.candles || [];
     if (!Array.isArray(candles) || candles.length === 0) return;
 
-    // update liveData
     setLiveData((prev) => ({ ...(prev || {}), ...livePayload, candles }));
 
-    const equityData = candles.map((c) => ({ date: c.time, equity: Number(c.close) }));
+    const equityData = candles.map((c) => ({
+      date: c.time,
+      equity: Number(c.close),
+    }));
+
     let peak = -Infinity;
     const drawdownData = equityData.map((p) => {
       if (p.equity > peak) peak = p.equity;
-      return { date: p.date, value: peak === -Infinity ? 0 : (p.equity - peak) / peak };
+      return {
+        date: p.date,
+        value: peak === -Infinity ? 0 : (p.equity - peak) / peak,
+      };
     });
 
     const returns = [];
@@ -255,9 +289,16 @@ export function DataProvider({ children }) {
       orders: livePayload.orders || [],
       tradeVolume: [],
       kpis: {
-        total_pl: equityData.length ? equityData[equityData.length - 1].equity - equityData[0].equity : 0,
-        win_rate: returns.length ? returns.filter((r) => r > 0).length / returns.length : 0,
-        max_drawdown: drawdownData.length ? Math.min(...drawdownData.map((d) => d.value)) : 0,
+        total_pl: equityData.length
+          ? equityData[equityData.length - 1].equity -
+            equityData[0].equity
+          : 0,
+        win_rate: returns.length
+          ? returns.filter((r) => r > 0).length / returns.length
+          : 0,
+        max_drawdown: drawdownData.length
+          ? Math.min(...drawdownData.map((d) => d.value))
+          : 0,
         total_trades: (livePayload.orders || []).length,
       },
     };
@@ -300,12 +341,15 @@ export function DataProvider({ children }) {
     if (typeof onMessage === "function") wsManager.subscribe(onMessage);
     return wsManager.connect(symbol, opts);
   }
+
   function disconnectWS() {
     return wsManager.disconnect();
   }
+
   function subscribeTrades(handler) {
     wsManager.subscribe(handler);
   }
+
   function unsubscribeTrades(handler) {
     wsManager.unsubscribe(handler);
   }
@@ -320,7 +364,9 @@ export function DataProvider({ children }) {
     mode,
     setMode,
     get current() {
-      return mode === "live" && liveData ? { ...(liveData || {}), source: "live" } : data || csvData || {};
+      return mode === "live" && liveData
+        ? { ...(liveData || {}), source: "live" }
+        : data || csvData || {};
     },
     loadCSVFile,
     loadMultipleCSVFiles,
