@@ -159,7 +159,7 @@ export function DataProvider({ children }) {
             high: Number(raw[t]["2. high"]),
             low: Number(raw[t]["3. low"]),
             close: Number(raw[t]["4. close"]),
-            volume: Number(raw[t]["6. volume"] || raw[t]["5. volume"] || 0),
+            volume: Number(raw[t]["6. volume"] || 0),
           }));
           return { source: "alphavantage", symbol, interval, candles };
         } else {
@@ -198,8 +198,7 @@ export function DataProvider({ children }) {
       )}`;
       const res = await axios.get(url);
       return res.data;
-    } catch (err) {
-      console.error("fetchOrderbook error", err);
+    } catch {
       return null;
     }
   }, []);
@@ -290,11 +289,15 @@ export function DataProvider({ children }) {
       orders: livePayload.orders || [],
       tradeVolume: [],
       kpis: {
-        total_pl: equityData.length
-          ? equityData[equityData.length - 1].equity -
-            equityData[0].equity
-          : 0,
-        win_rate: returns.filter((r) => r > 0).length / returns.length || 0,
+        total_pl:
+          equityData.length > 1
+            ? equityData[equityData.length - 1].equity -
+              equityData[0].equity
+            : 0,
+        win_rate:
+          returns.length > 0
+            ? returns.filter((r) => r > 0).length / returns.length
+            : 0,
         max_drawdown: Math.min(...drawdownData.map((d) => d.value)),
         total_trades: (livePayload.orders || []).length,
       },
